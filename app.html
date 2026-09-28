@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClayMath</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 760px; margin: 0 auto; padding: 1em; color: #2d2624; background: #f8f4f1; }
+  h1 { font-size: 1.5em; }
+  .card { background: #fff; border: 1px solid #e6d8d1; border-radius: 10px; padding: 1em 1.2em; margin: 1em 0; }
+  .card h2 { margin-top: 0; font-size: 1.1em; }
+  label { display: inline-block; min-width: 195px; margin: 0.3em 0; }
+  input, select { padding: 0.3em; border: 1px solid #cfb9ae; border-radius: 6px; width: 110px; }
+  .out { background: #f4e9e3; border-left: 4px solid #8c4a38; padding: 0.6em 0.9em; border-radius: 0 8px 8px 0; margin-top: 0.7em; }
+  .preset { display:inline-block; margin: 0 0.4em 0.4em 0; padding: 0.25em 0.7em; background: #efdfd7; border-radius: 20px; cursor: pointer; font-size: 0.85em; border: 1px solid #cfb9ae; }
+  .note { color: #77645c; font-size: 0.9em; }
+  a { color: #8c4a38; }
+</style>
+</head>
+<body>
+<h1>&#127994; ClayMath</h1>
+<p class="note">Constants: stoneware shrinks about 12% wet to glaze-fired. A mug takes 0.75 lb of wet clay. Bisque cone 06 (999C), glaze cone 6 (1222C). Kiln draws about 7 kW through a firing. <a href="index.html">About</a></p>
+
+<div class="card">
+  <h2>1. Shrinkage</h2>
+  <div>
+    <span class="preset" data-s="8">Low-shrink 8%</span>
+    <span class="preset" data-s="12">Stoneware 12%</span>
+    <span class="preset" data-s="15">Terra cotta 15%</span>
+  </div>
+  <label for="fired">Wanted fired size (cm):</label><input id="fired" type="number" value="10" min="1" step="0.5"><br>
+  <label for="shrink">Body shrinkage (%):</label><input id="shrink" type="number" value="12" step="0.5" min="0">
+  <div class="out" id="shrinkOut">-</div>
+</div>
+
+<div class="card">
+  <h2>2. Clay per bag</h2>
+  <label for="bag">Bag size (lb):</label><input id="bag" type="number" value="25" min="1"><br>
+  <label for="perPiece">Clay per piece (lb):</label><input id="perPiece" type="number" value="0.75" step="0.05" min="0.1"><br>
+  <label for="trim">Trim/reclaim loss (%):</label><input id="trim" type="number" value="15" min="0">
+  <div class="out" id="bagOut">-</div>
+</div>
+
+<div class="card">
+  <h2>3. Firing</h2>
+  <label for="cone">Cone:</label>
+  <select id="cone">
+    <option value="06" selected>06 (bisque, 999C)</option>
+    <option value="04">04 (low glaze, 1060C)</option>
+    <option value="6">6 (mid glaze, 1222C)</option>
+    <option value="10">10 (high fire, 1305C)</option>
+  </select><br>
+  <label for="kilnMax">Kiln max temp (C):</label><input id="kilnMax" type="number" value="1300" min="0">
+  <div class="out" id="fireOut">-</div>
+</div>
+
+<div class="card">
+  <h2>4. Cost per piece</h2>
+  <label for="clayCost">Clay ($/lb):</label><input id="clayCost" type="number" value="1.2" step="0.1" min="0"><br>
+  <label for="glazeCost">Glaze per piece ($):</label><input id="glazeCost" type="number" value="0.8" step="0.1" min="0"><br>
+  <label for="fireHours">Firing hours:</label><input id="fireHours" type="number" value="8" min="1"><br>
+  <label for="kwh">Electricity ($/kWh):</label><input id="kwh" type="number" value="0.15" step="0.01" min="0">
+  <div class="out" id="fireCostOut">-</div>
+  <div class="out" id="costOut">-</div>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(function () {
+  function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+  function str(id) { return document.getElementById(id).value; }
+  function fmt(n, d) { return n.toFixed(d === undefined ? 1 : d); }
+
+  function update() {
+    var shrink = num('shrink');
+    var thrown = ClayMath.throwSize(Math.max(1, num('fired')), shrink);
+    document.getElementById('shrinkOut').textContent =
+      'Throw it ' + fmt(thrown) + ' cm to land at ' + num('fired') + ' cm. ' + ClayMath.shrinkVerdict(shrink);
+
+    var pieces = ClayMath.piecesPerBag(Math.max(1, num('bag')), Math.max(0.1, num('perPiece')), num('trim'));
+    document.getElementById('bagOut').textContent =
+      fmt(pieces, 1) + ' pieces per bag. ' + ClayMath.bagVerdict(pieces);
+
+    document.getElementById('fireOut').textContent = ClayMath.firingVerdict(str('cone'), num('kilnMax'));
+
+    var firingCost = ClayMath.firingCost(7, Math.max(1, num('fireHours')), num('kwh'));
+    var share = pieces > 0 ? firingCost / Math.floor(pieces) : 0;
+    document.getElementById('fireCostOut').textContent =
+      '$' + firingCost.toFixed(2) + ' a firing, $' + share.toFixed(2) + ' of kiln time per piece at this yield.';
+    var per = ClayMath.costPerPiece(Math.max(0.1, num('perPiece')), num('clayCost'), num('glazeCost'), share);
+    document.getElementById('costOut').textContent =
+      '$' + per.toFixed(2) + ' per piece in materials and firing. ' + ClayMath.costVerdict(per);
+  }
+
+  var presets = document.querySelectorAll('.preset');
+  for (var i = 0; i < presets.length; i++) {
+    presets[i].addEventListener('click', function () {
+      document.getElementById('shrink').value = this.getAttribute('data-s');
+      update();
+    });
+  }
+  var inputs = document.querySelectorAll('input, select');
+  for (var j = 0; j < inputs.length; j++) inputs[j].addEventListener('input', update);
+  update();
+})();
+</script>
+</body>
+</html>
